@@ -78,7 +78,25 @@ hr {
 # =====================================================
 # DATABASE
 # =====================================================
+import os
 
+# ============================================
+# AUTO CREATE WAREHOUSE IF MISSING
+# ============================================
+
+if not os.path.exists(
+    "warehouse"
+):
+
+    os.makedirs("warehouse")
+
+if not os.path.exists(
+    "warehouse/sales.duckdb"
+):
+
+    os.system(
+        "python3 ingestion/ingest_sales_data.py"
+    )
 conn = duckdb.connect("warehouse/sales.duckdb")
 
 df = conn.execute("""
