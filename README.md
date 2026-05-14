@@ -1,82 +1,103 @@
 # Revenue Intelligence Platform
 
-## Overview
-
-This project was built to solve a common reporting problem inside an e-commerce business: different teams calculating different revenue numbers from the same raw sales data.
-
-The goal was to create a trusted analytics pipeline that ingests daily CSV files, validates data quality, loads cleaned data into a warehouse, and powers an executive dashboard with consistent KPIs.
+Trusted executive reporting platform built using Python, DuckDB, SQL transformations, Streamlit, and modular data quality validation.
 
 ---
 
-# Problem Statement
+## Live Dashboard
 
-Daily sales CSVs were being shared across teams with:
-- duplicate records
-- schema inconsistencies
-- late-arriving files
-- missing values
-
-As a result, revenue reporting was inconsistent across finance, operations, and business teams.
-
-This pipeline creates a single trusted reporting layer for leadership dashboards.
+https://streaming-sales-pipeline-dpcvh8tegeqy5ucipundey.streamlit.app/
 
 ---
 
-# Architecture
+## Problem Statement
 
-Raw CSV Files
-↓
-Python Ingestion Pipeline
-↓
-Data Quality Validation
-↓
-DuckDB Warehouse
-↓
-SQL / DBT-style Transformation Models
-↓
-Streamlit Executive Dashboard
+Different business teams were calculating different revenue numbers from the same raw sales files.
+
+Finance, Operations, Product, and Leadership all reported conflicting metrics because:
+- revenue logic was inconsistent
+- duplicate records existed
+- late-arriving files were ignored differently
+- no centralized validation layer existed
+
+The goal of this project was to create:
+- one trusted revenue source
+- explainable reporting
+- automated data quality monitoring
+- executive-ready dashboards
 
 ---
 
-# Tech Stack
+## Architecture Diagram
+
+![Architecture](docs/architecture.png)
+
+---
+
+## Dashboard Preview
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+## Key Features
+
+### Data Ingestion
+- Recursive CSV ingestion
+- Late-arriving file support
+- Standardized revenue calculation
+- Idempotent reruns
+
+### Data Quality Validation
+- Schema validation
+- Duplicate detection
+- Missing value checks
+- Freshness monitoring
+- Revenue anomaly monitoring
+
+### Warehouse Layer
+- DuckDB analytical warehouse
+- Clean trusted reporting tables
+- SQL / DBT-style transformations
+
+### Executive Dashboard
+- Revenue KPIs
+- Revenue trends
+- Moving average analysis
+- Regional contribution
+- Product intelligence
+- Data quality monitoring
+
+---
+
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Ingestion | Python |
+| Validation | Pandas |
 | Warehouse | DuckDB |
-| Transformation | SQL / DBT-style models |
+| Transformations | SQL / DBT-style models |
 | Dashboard | Streamlit |
 | Visualization | Plotly |
-| Data Processing | Pandas |
 
 ---
 
-# Pipeline Features
+## Repository Structure
 
-## Ingestion
-
-- Recursive CSV ingestion
-- Late-arriving file detection
-- Batch processing
-- Idempotent re-runs
-
----
-
-## Data Quality Checks
-
-The pipeline validates:
-
-- duplicate order IDs
-- schema consistency
-- missing critical fields
-- revenue anomalies
-- late-arriving files
-
----
-
-## Revenue Logic
-
-Revenue is calculated using:
-
-```python
-qty * unit_price * (1 - discount_pct)
+```text
+streaming-sales-pipeline/
+│
+├── dashboard/
+├── data/
+├── docs/
+├── forecasting/
+├── ingestion/
+├── notebooks/
+├── quality_checks/
+├── scripts/
+├── transformations/
+├── warehouse/
+├── DECISIONS.md
+├── README.md
+└── requirements.txt
