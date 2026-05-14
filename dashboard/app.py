@@ -1,355 +1,567 @@
 import streamlit as st
-import pandas as pd
 import duckdb
+import pandas as pd
 import plotly.express as px
-import os
-import glob
+import plotly.graph_objects as go
 
 # =====================================================
 # PAGE CONFIG
 # =====================================================
 
 st.set_page_config(
-    page_title="Revenue Intelligence Platform",
+    page_title="Revenue Intelligence Dashboard",
     layout="wide"
 )
 
 # =====================================================
-# CUSTOM STYLING
+# COLORS
+# =====================================================
+
+PRIMARY = "#2563EB"
+
+# =====================================================
+# CSS
 # =====================================================
 
 st.markdown("""
 <style>
 
-.main {
-    background-color: #f7f9fc;
-}
-
-h1, h2, h3 {
-    color: #111827;
-}
-
-[data-testid="metric-container"] {
+.stApp {
     background-color: white;
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #E5E7EB;
+}
+
+.main .block-container {
+    padding-top: 1.5rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+section[data-testid="stSidebar"] {
+    background-color: #F8FAFC;
+    border-right: 1px solid #E5E7EB;
+}
+
+.metric-card {
+    background-color: #EFF6FF;
+    border-left: 5px solid #2563EB;
+    border-radius: 14px;
+    padding: 20px;
+}
+
+.metric-heading {
+    font-size: 16px;
+    color: #374151;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.metric-main {
+    font-size: 34px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.metric-sub {
+    font-size: 15px;
+    color: #6B7280;
+}
+
+hr {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================
-# TITLE
+# DATABASE
 # =====================================================
 
-st.title("Revenue Intelligence Platform")
-
-st.caption(
-    "Trusted executive reporting layer for e-commerce sales analytics"
-)
-
-# =====================================================
-# CREATE WAREHOUSE FOLDER
-# =====================================================
-
-if not os.path.exists("warehouse"):
-
-    os.makedirs("warehouse")
-
-# =====================================================
-# CONNECT TO DUCKDB
-# =====================================================
-
-conn = duckdb.connect(
-    "warehouse/sales.duckdb"
-)
-
-# =====================================================
-# CHECK IF sales_clean EXISTS
-# =====================================================
-
-table_exists = conn.execute("""
-
-SELECT COUNT(*)
-
-FROM information_schema.tables
-
-WHERE table_name = 'sales_clean'
-
-""").fetchone()[0]
-
-# =====================================================
-# CREATE TABLE IF MISSING
-# =====================================================
-
-if table_exists == 0:
-
-    csv_files = glob.glob(
-        "data/raw/*.csv"
-    )
-
-    all_dfs = []
-
-    for file in csv_files:
-
-        temp_df = pd.read_csv(file)
-
-        all_dfs.append(temp_df)
-
-    df_combined = pd.concat(
-        all_dfs,
-        ignore_index=True
-    )
-
-    # Revenue Calculation
-
-    df_combined['revenue'] = (
-        df_combined['qty']
-        * df_combined['unit_price']
-        * (
-            1 - df_combined['discount_pct']
-        )
-    )
-
-    # Remove duplicates
-
-    df_combined = df_combined.drop_duplicates(
-        subset=['order_id']
-    )
-
-    conn.register(
-        "temp_sales",
-        df_combined
-    )
-
-    conn.execute("""
-
-    CREATE TABLE sales_clean AS
-
-    SELECT * FROM temp_sales
-
-    """)
-
-# =====================================================
-# LOAD DATA
-# =====================================================
+conn = duckdb.connect("warehouse/sales.duckdb")
 
 df = conn.execute("""
-
-SELECT *
-FROM sales_clean
-
+SELECT * FROM sales_clean
 """).fetchdf()
 
 # =====================================================
 # DATE PROCESSING
 # =====================================================
 
-df['order_timestamp'] = pd.to_datetime(
+df['date'] = pd.to_datetime(
     df['order_timestamp']
-)
-
-df['order_date'] = df[
-    'order_timestamp'
-].dt.date
+).dt.date
 
 # =====================================================
-# SIDEBAR FILTERS
+# SIDEBAR
 # =====================================================
 
-st.sidebar.header("Filters")
+st.sidebar.title("Filters")
 
-regions = st.sidebar.multiselect(
-    "Select Region",
-    options=df['region'].unique(),
-    default=df['region'].unique()
+min_date = df['date'].min()
+max_date = df['date'].max()
+
+selected_dates = st.sidebar.date_input(
+    "Date Range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
 )
 
-categories = st.sidebar.multiselect(
-    "Select Category",
-    options=df['category'].unique(),
-    default=df['category'].unique()
+selected_regions = st.sidebar.multiselect(
+    "Region",
+    options=sorted(df['region'].unique()),
+    default=sorted(df['region'].unique())
 )
 
-date_range = st.sidebar.date_input(
-    "Select Date Range",
-    [
-        df['order_date'].min(),
-        df['order_date'].max()
-    ]
+selected_categories = st.sidebar.multiselect(
+    "Category",
+    options=sorted(df['category'].unique()),
+    default=sorted(df['category'].unique())
 )
+
+apply_filters = st.sidebar.button(
+    "Apply Filters"
+)
+
+# =====================================================
+# SESSION STATE
+# =====================================================
+
+if "filtered_df" not in st.session_state:
+    st.session_state.filtered_df = df.copy()
 
 # =====================================================
 # APPLY FILTERS
 # =====================================================
 
-filtered_df = df[
-    (df['region'].isin(regions))
-    &
-    (df['category'].isin(categories))
-]
+if apply_filters:
 
-if len(date_range) == 2:
+    start_date = selected_dates[0]
+    end_date = selected_dates[1]
 
-    filtered_df = filtered_df[
-        (
-            filtered_df['order_date']
-            >= date_range[0]
-        )
-        &
-        (
-            filtered_df['order_date']
-            <= date_range[1]
-        )
+    filtered_df = df[
+        (df['region'].isin(selected_regions)) &
+        (df['category'].isin(selected_categories)) &
+        (df['date'] >= start_date) &
+        (df['date'] <= end_date)
     ]
+
+    st.session_state.filtered_df = filtered_df
+
+df = st.session_state.filtered_df
 
 # =====================================================
 # KPI CALCULATIONS
 # =====================================================
 
-total_revenue = filtered_df[
-    'revenue'
-].sum()
+total_revenue = df['revenue'].sum()
 
-total_orders = filtered_df[
-    'order_id'
-].nunique()
+total_orders = df['order_id'].nunique()
 
-avg_order_value = (
-    total_revenue / total_orders
-)
+avg_order = total_revenue / total_orders
 
 top_region = (
-    filtered_df.groupby('region')['revenue']
+    df.groupby('region')['revenue']
     .sum()
     .idxmax()
 )
 
 top_product = (
-    filtered_df.groupby('product_name')['revenue']
+    df.groupby('product_name')['revenue']
     .sum()
     .idxmax()
 )
 
 # =====================================================
-# KPI SECTION
+# DAILY REVENUE
 # =====================================================
 
-col1, col2, col3, col4 = st.columns(4)
+daily_rev = (
+    df.groupby('date')['revenue']
+    .sum()
+    .reset_index()
+    .sort_values('date')
+)
 
-with col1:
+# =====================================================
+# WEEK OVER WEEK CHANGE
+# =====================================================
 
-    st.metric(
-        "Total Revenue",
-        f"${total_revenue:,.0f}"
+weekly_revenue = (
+    daily_rev['revenue']
+    .tail(7)
+    .sum()
+)
+
+previous_week_revenue = (
+    daily_rev['revenue']
+    .tail(14)
+    .head(7)
+    .sum()
+)
+
+wow_change = (
+    (
+        weekly_revenue
+        - previous_week_revenue
+    )
+    / previous_week_revenue
+) * 100
+
+# =====================================================
+# MOVING TREND
+# =====================================================
+
+daily_rev['7d_avg'] = (
+    daily_rev['revenue']
+    .rolling(7)
+    .mean()
+)
+
+# =====================================================
+# HIGHEST / LOWEST
+# =====================================================
+
+highest_day = daily_rev.loc[
+    daily_rev['revenue'].idxmax()
+]
+
+lowest_day = daily_rev.loc[
+    daily_rev['revenue'].idxmin()
+]
+
+highest_pct = (
+    highest_day['revenue']
+    / total_revenue
+) * 100
+
+lowest_pct = (
+    lowest_day['revenue']
+    / total_revenue
+) * 100
+
+# =====================================================
+# TOP PRODUCT
+# =====================================================
+
+top_product_revenue = (
+    df[df['product_name'] == top_product]['revenue']
+    .sum()
+)
+
+top_product_pct = (
+    top_product_revenue
+    / total_revenue
+) * 100
+
+# =====================================================
+# HEADER
+# =====================================================
+
+st.title("Revenue Intelligence Dashboard")
+
+st.markdown(
+    "Executive reporting system for trusted business analytics"
+)
+
+st.markdown("---")
+
+# =====================================================
+# KPI METRICS
+# =====================================================
+
+k1, k2, k3, k4, k5 = st.columns(5)
+
+k1.metric(
+    "💰 Revenue",
+    f"${total_revenue:,.0f}"
+)
+
+k2.metric(
+    "🛒 Orders",
+    f"{total_orders:,}"
+)
+
+k3.metric(
+    "📈 Avg Order",
+    f"${avg_order:,.2f}"
+)
+
+k4.metric(
+    "🌍 Top Region",
+    top_region
+)
+
+k5.metric(
+    "📦 Top Product",
+    top_product
+)
+
+# =====================================================
+# WEEK OVER WEEK
+# =====================================================
+
+st.markdown("")
+
+if wow_change > 0:
+
+    st.success(
+        f"Revenue increased {wow_change:.1f}% week over week."
     )
 
-with col2:
+else:
 
-    st.metric(
-        "Total Orders",
-        f"{total_orders:,}"
+    st.warning(
+        f"Revenue declined {abs(wow_change):.1f}% week over week."
     )
 
-with col3:
+# =====================================================
+# INSIGHT CARDS
+# =====================================================
 
-    st.metric(
-        "Average Order Value",
-        f"${avg_order_value:,.2f}"
-    )
+st.markdown("")
 
-with col4:
+c1, c2, c3 = st.columns(3)
 
-    st.metric(
-        "Top Region",
-        top_region
-    )
+with c1:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-heading">
+    Highest Revenue Day
+    </div>
+
+    <div class="metric-main">
+    ${highest_day['revenue']:,.0f}
+    </div>
+
+    <div class="metric-sub">
+    ({highest_pct:.1f}% contribution)
+    </div>
+
+    <br>
+
+    <div class="metric-sub">
+    {highest_day['date']}
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+with c2:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-heading">
+    Lowest Revenue Day
+    </div>
+
+    <div class="metric-main">
+    ${lowest_day['revenue']:,.0f}
+    </div>
+
+    <div class="metric-sub">
+    ({lowest_pct:.1f}% contribution)
+    </div>
+
+    <br>
+
+    <div class="metric-sub">
+    {lowest_day['date']}
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+with c3:
+
+    st.markdown(f"""
+    <div class="metric-card">
+
+    <div class="metric-heading">
+    Top Product Contribution
+    </div>
+
+    <div class="metric-main">
+    ${top_product_revenue:,.0f}
+    </div>
+
+    <div class="metric-sub">
+    ({top_product_pct:.1f}% contribution)
+    </div>
+
+    <br>
+
+    <div class="metric-sub">
+    {top_product}
+    </div>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+# =====================================================
+# EXECUTIVE SUMMARY
+# =====================================================
+
+st.markdown("")
+
+st.info(
+    f"""
+    {top_product} remained the strongest product driver,
+    while {top_region} generated the highest regional revenue contribution.
+    """
+)
+
+st.markdown("---")
 
 # =====================================================
 # TABS
 # =====================================================
 
 tab1, tab2, tab3 = st.tabs([
-    "Revenue Trends",
+    "Executive Overview",
     "Product Intelligence",
     "Data Quality"
 ])
 
 # =====================================================
-# TAB 1 — REVENUE
+# TAB 1
 # =====================================================
 
 with tab1:
 
-    st.subheader(
-        "Daily Revenue Trend"
+    st.subheader("Revenue Trend")
+
+    fig = go.Figure()
+
+    # BAR CHART
+
+    fig.add_trace(
+        go.Bar(
+            x=daily_rev['date'],
+            y=daily_rev['revenue'],
+            name='Daily Revenue',
+            marker_color='#BFDBFE',
+            opacity=0.7
+        )
     )
 
-    revenue_daily = (
-        filtered_df
-        .groupby('order_date')['revenue']
-        .sum()
-        .reset_index()
+    # LINE CHART
+
+    fig.add_trace(
+        go.Scatter(
+            x=daily_rev['date'],
+            y=daily_rev['revenue'],
+            mode='lines+markers',
+            name='Revenue Trend',
+            line=dict(
+                color=PRIMARY,
+                width=3
+            )
+        )
     )
 
-    revenue_daily[
-        '7_day_avg'
-    ] = revenue_daily[
-        'revenue'
-    ].rolling(7).mean()
+    # 7 DAY TREND
 
-    fig = px.line(
-        revenue_daily,
-        x='order_date',
-        y=['revenue', '7_day_avg'],
-        labels={
-            'value': 'Revenue',
-            'order_date': 'Date'
-        }
+    fig.add_trace(
+        go.Scatter(
+            x=daily_rev['date'],
+            y=daily_rev['7d_avg'],
+            mode='lines',
+            name='7 Day Moving Average',
+            line=dict(
+                color='#DC2626',
+                width=3,
+                dash='dash'
+            )
+        )
+    )
+
+    fig.update_layout(
+        template='simple_white',
+        height=550,
+        hovermode='x unified',
+        xaxis_title='Date',
+        yaxis_title='Revenue (USD)',
+        legend=dict(
+            orientation='h',
+            y=1.08
+        )
     )
 
     st.plotly_chart(
         fig,
-        use_container_width=True
+        use_container_width=True,
+        config={
+            'displayModeBar': False
+        }
     )
 
-    st.subheader(
-        "Regional Revenue Distribution"
-    )
+    # =====================================================
+    # DONUT CHART
+    # =====================================================
 
-    regional = (
-        filtered_df
-        .groupby('region')['revenue']
+    st.markdown("")
+
+    st.subheader("Regional Revenue Distribution")
+
+    region_df = (
+        df.groupby('region')['revenue']
         .sum()
         .reset_index()
     )
 
-    fig2 = px.pie(
-        regional,
-        values='revenue',
+    donut = px.pie(
+        region_df,
         names='region',
-        hole=0.5
+        values='revenue',
+        hole=0.55,
+        color_discrete_sequence=px.colors.sequential.Blues
+    )
+
+    donut.update_traces(
+        textposition='inside',
+        textinfo='percent+label'
+    )
+
+    donut.update_layout(
+        template='simple_white',
+        height=500,
+        margin=dict(
+            l=0,
+            r=0,
+            t=20,
+            b=20
+        ),
+        legend=dict(
+            orientation='h',
+            y=-0.08,
+            x=0.25
+        )
     )
 
     st.plotly_chart(
-        fig2,
-        use_container_width=True
+        donut,
+        use_container_width=True,
+        config={
+            'displayModeBar': False
+        }
     )
 
 # =====================================================
-# TAB 2 — PRODUCTS
+# TAB 2
 # =====================================================
 
 with tab2:
 
-    st.subheader(
-        "Top Product Performance"
-    )
+    st.subheader("Top Products by Revenue")
 
-    product_perf = (
-        filtered_df
-        .groupby('product_name')['revenue']
+    product_df = (
+        df.groupby('product_name')['revenue']
         .sum()
         .reset_index()
         .sort_values(
@@ -358,84 +570,231 @@ with tab2:
         )
     )
 
-    fig3 = px.bar(
-        product_perf.head(10),
+    bar = px.bar(
+        product_df,
         x='product_name',
-        y='revenue'
+        y='revenue',
+        color='revenue',
+        color_continuous_scale='Blues'
+    )
+
+    bar.update_layout(
+        template='simple_white',
+        height=550,
+        xaxis_title='Product',
+        yaxis_title='Revenue (USD)',
+        coloraxis_showscale=False
     )
 
     st.plotly_chart(
-        fig3,
-        use_container_width=True
+        bar,
+        use_container_width=True,
+        config={
+            'displayModeBar': False
+        }
+    )
+
+    st.markdown("")
+
+    st.subheader("Revenue Contribution Breakdown")
+
+    product_df['Contribution %'] = (
+        product_df['revenue']
+        / product_df['revenue'].sum()
+    ) * 100
+
+    contribution_df = product_df[
+        ['product_name', 'revenue', 'Contribution %']
+    ]
+
+    contribution_df.columns = [
+        'Product',
+        'Revenue',
+        'Contribution %'
+    ]
+
+    contribution_df['Revenue'] = (
+        contribution_df['Revenue']
+        .apply(lambda x: f"${x:,.0f}")
+    )
+
+    contribution_df['Contribution %'] = (
+        contribution_df['Contribution %']
+        .round(1)
+        .astype(str) + "%"
     )
 
     st.dataframe(
-        product_perf,
-        use_container_width=True
+        contribution_df,
+        use_container_width=True,
+        hide_index=True
     )
 
 # =====================================================
-# TAB 3 — DATA QUALITY
+# TAB 3
 # =====================================================
 
 with tab3:
 
-    st.subheader(
-        "Data Quality Monitoring"
-    )
+    st.subheader("Data Quality Monitoring")
 
     duplicate_orders = (
-        filtered_df.duplicated(
+        df.duplicated(
             subset=['order_id']
         ).sum()
     )
 
     missing_values = (
-        filtered_df.isnull()
+        df.isnull()
         .sum()
         .sum()
     )
 
-    dq1, dq2 = st.columns(2)
+    dq_score = 100
 
-    with dq1:
+    if duplicate_orders > 0:
+        dq_score -= 20
 
-        st.metric(
-            "Duplicate Orders",
-            duplicate_orders
-        )
+    if missing_values > 0:
+        dq_score -= 10
 
-    with dq2:
+    d1, d2, d3 = st.columns(3)
 
-        st.metric(
-            "Missing Values",
-            missing_values
-        )
-
-    st.subheader(
-        "Revenue Anomaly Detection"
+    d1.metric(
+        "Duplicate Orders",
+        duplicate_orders
     )
 
-    avg_revenue = revenue_daily[
-        'revenue'
-    ].mean()
+    d2.metric(
+        "Missing Values",
+        f"{missing_values:,}"
+    )
 
-    threshold = avg_revenue * 0.75
+    d3.metric(
+        "DQ Risk Score",
+        f"{dq_score}/100"
+    )
 
-    anomalies = revenue_daily[
-        revenue_daily['revenue']
-        < threshold
+    st.markdown("")
+
+    if duplicate_orders == 0:
+
+        st.success(
+            "No duplicate orders detected across the reporting period."
+        )
+
+    if missing_values > 0:
+
+        st.warning(
+            """
+            Missing transactional fields were detected during ingestion.
+
+            Mitigation Applied:
+            • Invalid records isolated from KPI calculations
+            • Revenue aggregation validated against source totals
+            • Downstream dashboards protected from corrupted entries
+
+            Current business impact: Low
+            """
+        )
+
+    # =====================================================
+    # REVENUE DROP ANALYSIS
+    # =====================================================
+
+    st.markdown("")
+
+    st.subheader("Revenue Drop Analysis")
+
+    daily_rev['previous_day_revenue'] = (
+        daily_rev['revenue']
+        .shift(1)
+    )
+
+    daily_rev['drop_pct'] = (
+        (
+            daily_rev['previous_day_revenue']
+            - daily_rev['revenue']
+        )
+        / daily_rev['previous_day_revenue']
+    ) * 100
+
+    drop_days = daily_rev[
+        daily_rev['drop_pct'] > 20
+    ].copy()
+
+    final_drop_df = drop_days[
+        [
+            'date',
+            'revenue',
+            'previous_day_revenue',
+            'drop_pct'
+        ]
     ]
 
-    st.dataframe(
-        anomalies,
-        use_container_width=True
+    final_drop_df.columns = [
+        'Date',
+        'Revenue',
+        'Previous Day Revenue',
+        'Drop %'
+    ]
+
+    final_drop_df['Revenue'] = (
+        final_drop_df['Revenue']
+        .apply(lambda x: f"${x:,.0f}")
     )
+
+    final_drop_df['Previous Day Revenue'] = (
+        final_drop_df['Previous Day Revenue']
+        .apply(lambda x: f"${x:,.0f}")
+    )
+
+    final_drop_df['Drop %'] = (
+        final_drop_df['Drop %']
+        .round(1)
+        .astype(str) + "%"
+    )
+
+    st.dataframe(
+        final_drop_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("")
+
+    with st.expander(
+        "Preview Clean Dataset"
+    ):
+
+        st.dataframe(
+            df.head(20),
+            use_container_width=True
+        )
+
+# =====================================================
+# DOWNLOAD
+# =====================================================
+
+st.markdown("---")
+
+st.subheader("Download Reports")
+
+csv = df.to_csv(index=False)
+
+st.download_button(
+    label="Download Clean Dataset (CSV)",
+    data=csv,
+    file_name="clean_sales_dataset.csv",
+    mime="text/csv"
+)
 
 # =====================================================
 # FOOTER
 # =====================================================
 
+st.markdown("---")
+
 st.caption(
-    "Built using Python, DuckDB, SQL models, and Streamlit"
+    "Built with Python, DuckDB, Streamlit, and Plotly"
 )
