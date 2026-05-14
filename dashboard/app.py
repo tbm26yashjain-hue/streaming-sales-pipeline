@@ -31,9 +31,10 @@ st.markdown("""
 }
 
 .main .block-container {
-    padding-top: 1.5rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-top: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    max-width: 100%;
 }
 
 section[data-testid="stSidebar"] {
@@ -45,25 +46,26 @@ section[data-testid="stSidebar"] {
     background-color: #EFF6FF;
     border-left: 5px solid #2563EB;
     border-radius: 14px;
-    padding: 20px;
+    padding: 18px;
+    margin-bottom: 10px;
 }
 
 .metric-heading {
-    font-size: 16px;
+    font-size: 15px;
     color: #374151;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     font-weight: 600;
 }
 
 .metric-main {
-    font-size: 34px;
+    font-size: 26px;
     font-weight: 700;
     color: #111827;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .metric-sub {
-    font-size: 15px;
+    font-size: 14px;
     color: #6B7280;
 }
 
@@ -79,7 +81,9 @@ hr {
 # DATABASE
 # =====================================================
 
-conn = duckdb.connect("warehouse/sales.duckdb")
+conn = duckdb.connect(
+    "warehouse/sales.duckdb"
+)
 
 df = conn.execute("""
 SELECT * FROM sales_clean
@@ -130,6 +134,7 @@ apply_filters = st.sidebar.button(
 # =====================================================
 
 if "filtered_df" not in st.session_state:
+
     st.session_state.filtered_df = df.copy()
 
 # =====================================================
@@ -185,8 +190,14 @@ daily_rev = (
     .sort_values('date')
 )
 
+daily_rev['7d_avg'] = (
+    daily_rev['revenue']
+    .rolling(7)
+    .mean()
+)
+
 # =====================================================
-# WEEK OVER WEEK CHANGE
+# WEEK OVER WEEK
 # =====================================================
 
 weekly_revenue = (
@@ -209,16 +220,6 @@ wow_change = (
     )
     / previous_week_revenue
 ) * 100
-
-# =====================================================
-# MOVING TREND
-# =====================================================
-
-daily_rev['7d_avg'] = (
-    daily_rev['revenue']
-    .rolling(7)
-    .mean()
-)
 
 # =====================================================
 # HIGHEST / LOWEST
@@ -262,39 +263,49 @@ top_product_pct = (
 
 st.title("Revenue Intelligence Dashboard")
 
-st.markdown(
-    "Executive reporting system for trusted business analytics"
+st.caption(
+    "Trusted executive reporting platform"
 )
 
 st.markdown("---")
 
 # =====================================================
-# KPI METRICS
+# KPI ROWS
 # =====================================================
 
-k1, k2, k3, k4, k5 = st.columns(5)
+k1, k2 = st.columns(2)
 
-k1.metric(
-    "💰 Revenue",
-    f"${total_revenue:,.0f}"
-)
+with k1:
 
-k2.metric(
-    "🛒 Orders",
-    f"{total_orders:,}"
-)
+    st.metric(
+        "💰 Revenue",
+        f"${total_revenue:,.0f}"
+    )
 
-k3.metric(
-    "📈 Avg Order",
-    f"${avg_order:,.2f}"
-)
+with k2:
 
-k4.metric(
-    "🌍 Top Region",
-    top_region
-)
+    st.metric(
+        "🛒 Orders",
+        f"{total_orders:,}"
+    )
 
-k5.metric(
+k3, k4 = st.columns(2)
+
+with k3:
+
+    st.metric(
+        "📈 Avg Order",
+        f"${avg_order:,.2f}"
+    )
+
+with k4:
+
+    st.metric(
+        "🌍 Top Region",
+        top_region
+    )
+
+st.metric(
     "📦 Top Product",
     top_product
 )
@@ -302,8 +313,6 @@ k5.metric(
 # =====================================================
 # WEEK OVER WEEK
 # =====================================================
-
-st.markdown("")
 
 if wow_change > 0:
 
@@ -321,99 +330,96 @@ else:
 # INSIGHT CARDS
 # =====================================================
 
-st.markdown("")
-
-c1, c2, c3 = st.columns(3)
+c1 = st.container()
 
 with c1:
 
-    st.markdown(f"""
-    <div class="metric-card">
+    a, b, c = st.columns(3)
 
-    <div class="metric-heading">
-    Highest Revenue Day
-    </div>
+    with a:
 
-    <div class="metric-main">
-    ${highest_day['revenue']:,.0f}
-    </div>
+        st.markdown(f"""
+        <div class="metric-card">
 
-    <div class="metric-sub">
-    ({highest_pct:.1f}% contribution)
-    </div>
+        <div class="metric-heading">
+        Highest Revenue Day
+        </div>
 
-    <br>
+        <div class="metric-main">
+        ${highest_day['revenue']:,.0f}
+        </div>
 
-    <div class="metric-sub">
-    {highest_day['date']}
-    </div>
+        <div class="metric-sub">
+        ({highest_pct:.1f}% contribution)
+        </div>
 
-    </div>
-    """, unsafe_allow_html=True)
+        <br>
 
-with c2:
+        <div class="metric-sub">
+        {highest_day['date']}
+        </div>
 
-    st.markdown(f"""
-    <div class="metric-card">
+        </div>
+        """, unsafe_allow_html=True)
 
-    <div class="metric-heading">
-    Lowest Revenue Day
-    </div>
+    with b:
 
-    <div class="metric-main">
-    ${lowest_day['revenue']:,.0f}
-    </div>
+        st.markdown(f"""
+        <div class="metric-card">
 
-    <div class="metric-sub">
-    ({lowest_pct:.1f}% contribution)
-    </div>
+        <div class="metric-heading">
+        Lowest Revenue Day
+        </div>
 
-    <br>
+        <div class="metric-main">
+        ${lowest_day['revenue']:,.0f}
+        </div>
 
-    <div class="metric-sub">
-    {lowest_day['date']}
-    </div>
+        <div class="metric-sub">
+        ({lowest_pct:.1f}% contribution)
+        </div>
 
-    </div>
-    """, unsafe_allow_html=True)
+        <br>
 
-with c3:
+        <div class="metric-sub">
+        {lowest_day['date']}
+        </div>
 
-    st.markdown(f"""
-    <div class="metric-card">
+        </div>
+        """, unsafe_allow_html=True)
 
-    <div class="metric-heading">
-    Top Product Contribution
-    </div>
+    with c:
 
-    <div class="metric-main">
-    ${top_product_revenue:,.0f}
-    </div>
+        st.markdown(f"""
+        <div class="metric-card">
 
-    <div class="metric-sub">
-    ({top_product_pct:.1f}% contribution)
-    </div>
+        <div class="metric-heading">
+        Top Product Contribution
+        </div>
 
-    <br>
+        <div class="metric-main">
+        ${top_product_revenue:,.0f}
+        </div>
 
-    <div class="metric-sub">
-    {top_product}
-    </div>
+        <div class="metric-sub">
+        ({top_product_pct:.1f}% contribution)
+        </div>
 
-    </div>
-    """, unsafe_allow_html=True)
+        <br>
+
+        <div class="metric-sub">
+        {top_product}
+        </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
 # =====================================================
 # EXECUTIVE SUMMARY
 # =====================================================
 
-st.markdown("")
-
 st.info(
-    f"""
-    {top_product} remained the strongest product driver,
-    while {top_region} generated the highest regional revenue contribution.
-    """
+    f"{top_product} remained the strongest product driver while {top_region} generated the highest regional contribution."
 )
 
 st.markdown("---")
@@ -434,11 +440,9 @@ tab1, tab2, tab3 = st.tabs([
 
 with tab1:
 
-    st.subheader("Revenue Trend")
+    st.subheader("Revenue Trend & Moving Average")
 
     fig = go.Figure()
-
-    # BAR CHART
 
     fig.add_trace(
         go.Bar(
@@ -450,13 +454,11 @@ with tab1:
         )
     )
 
-    # LINE CHART
-
     fig.add_trace(
         go.Scatter(
             x=daily_rev['date'],
             y=daily_rev['revenue'],
-            mode='lines+markers',
+            mode='lines',
             name='Revenue Trend',
             line=dict(
                 color=PRIMARY,
@@ -465,14 +467,12 @@ with tab1:
         )
     )
 
-    # 7 DAY TREND
-
     fig.add_trace(
         go.Scatter(
             x=daily_rev['date'],
             y=daily_rev['7d_avg'],
             mode='lines',
-            name='7 Day Moving Average',
+            name='7 Day Moving Avg',
             line=dict(
                 color='#DC2626',
                 width=3,
@@ -483,10 +483,10 @@ with tab1:
 
     fig.update_layout(
         template='simple_white',
-        height=550,
+        height=420,
         hovermode='x unified',
         xaxis_title='Date',
-        yaxis_title='Revenue (USD)',
+        yaxis_title='Revenue',
         legend=dict(
             orientation='h',
             y=1.08
@@ -502,50 +502,40 @@ with tab1:
     )
 
     # =====================================================
-    # DONUT CHART
+    # REGIONAL PERFORMANCE
     # =====================================================
 
-    st.markdown("")
-
-    st.subheader("Regional Revenue Distribution")
+    st.subheader("Regional Revenue Contribution")
 
     region_df = (
         df.groupby('region')['revenue']
         .sum()
         .reset_index()
-    )
-
-    donut = px.pie(
-        region_df,
-        names='region',
-        values='revenue',
-        hole=0.55,
-        color_discrete_sequence=px.colors.sequential.Blues
-    )
-
-    donut.update_traces(
-        textposition='inside',
-        textinfo='percent+label'
-    )
-
-    donut.update_layout(
-        template='simple_white',
-        height=500,
-        margin=dict(
-            l=0,
-            r=0,
-            t=20,
-            b=20
-        ),
-        legend=dict(
-            orientation='h',
-            y=-0.08,
-            x=0.25
+        .sort_values(
+            by='revenue',
+            ascending=True
         )
     )
 
+    regional_bar = px.bar(
+        region_df,
+        x='revenue',
+        y='region',
+        orientation='h',
+        color='revenue',
+        color_continuous_scale='Blues'
+    )
+
+    regional_bar.update_layout(
+        template='simple_white',
+        height=350,
+        xaxis_title='Revenue',
+        yaxis_title='Region',
+        coloraxis_showscale=False
+    )
+
     st.plotly_chart(
-        donut,
+        regional_bar,
         use_container_width=True,
         config={
             'displayModeBar': False
@@ -568,6 +558,7 @@ with tab2:
             by='revenue',
             ascending=False
         )
+        .head(10)
     )
 
     bar = px.bar(
@@ -580,9 +571,9 @@ with tab2:
 
     bar.update_layout(
         template='simple_white',
-        height=550,
+        height=420,
         xaxis_title='Product',
-        yaxis_title='Revenue (USD)',
+        yaxis_title='Revenue',
         coloraxis_showscale=False
     )
 
@@ -592,42 +583,6 @@ with tab2:
         config={
             'displayModeBar': False
         }
-    )
-
-    st.markdown("")
-
-    st.subheader("Revenue Contribution Breakdown")
-
-    product_df['Contribution %'] = (
-        product_df['revenue']
-        / product_df['revenue'].sum()
-    ) * 100
-
-    contribution_df = product_df[
-        ['product_name', 'revenue', 'Contribution %']
-    ]
-
-    contribution_df.columns = [
-        'Product',
-        'Revenue',
-        'Contribution %'
-    ]
-
-    contribution_df['Revenue'] = (
-        contribution_df['Revenue']
-        .apply(lambda x: f"${x:,.0f}")
-    )
-
-    contribution_df['Contribution %'] = (
-        contribution_df['Contribution %']
-        .round(1)
-        .astype(str) + "%"
-    )
-
-    st.dataframe(
-        contribution_df,
-        use_container_width=True,
-        hide_index=True
     )
 
 # =====================================================
@@ -677,34 +632,9 @@ with tab3:
 
     st.markdown("")
 
-    if duplicate_orders == 0:
-
-        st.success(
-            "No duplicate orders detected across the reporting period."
-        )
-
-    if missing_values > 0:
-
-        st.warning(
-            """
-            Missing transactional fields were detected during ingestion.
-
-            Mitigation Applied:
-            • Invalid records isolated from KPI calculations
-            • Revenue aggregation validated against source totals
-            • Downstream dashboards protected from corrupted entries
-
-            Current business impact: Low
-            """
-        )
-
-    # =====================================================
-    # REVENUE DROP ANALYSIS
-    # =====================================================
-
-    st.markdown("")
-
-    st.subheader("Revenue Drop Analysis")
+    st.subheader(
+        "Daily Revenue Volatility"
+    )
 
     daily_rev['previous_day_revenue'] = (
         daily_rev['revenue']
@@ -756,38 +686,10 @@ with tab3:
     )
 
     st.dataframe(
-        final_drop_df,
+        final_drop_df.head(5),
         use_container_width=True,
         hide_index=True
     )
-
-    st.markdown("")
-
-    with st.expander(
-        "Preview Clean Dataset"
-    ):
-
-        st.dataframe(
-            df.head(20),
-            use_container_width=True
-        )
-
-# =====================================================
-# DOWNLOAD
-# =====================================================
-
-st.markdown("---")
-
-st.subheader("Download Reports")
-
-csv = df.to_csv(index=False)
-
-st.download_button(
-    label="Download Clean Dataset (CSV)",
-    data=csv,
-    file_name="clean_sales_dataset.csv",
-    mime="text/csv"
-)
 
 # =====================================================
 # FOOTER
