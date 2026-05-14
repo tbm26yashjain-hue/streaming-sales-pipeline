@@ -7,24 +7,27 @@ Trusted executive reporting platform built using Python, DuckDB, SQL transformat
 ## Live Dashboard
 
 https://streaming-sales-pipeline-dpcvh8tegeqy5ucipundey.streamlit.app/
+---
+
+## GitHub Repository
+
+https://github.com/tbm26yashjain-hue/streaming-sales-pipeline
 
 ---
 
 ## Problem Statement
 
-Different business teams were calculating different revenue numbers from the same raw sales files.
-
-Finance, Operations, Product, and Leadership all reported conflicting metrics because:
-- revenue logic was inconsistent
+Business teams were reporting conflicting revenue numbers from the same sales files because:
 - duplicate records existed
-- late-arriving files were ignored differently
+- malformed files entered reporting
+- revenue logic differed across teams
 - no centralized validation layer existed
 
-The goal of this project was to create:
-- one trusted revenue source
-- explainable reporting
-- automated data quality monitoring
-- executive-ready dashboards
+The objective was to build:
+- a trusted reporting layer
+- automated data quality validation
+- centralized KPI calculations
+- and an executive-ready dashboard.
 
 ---
 
@@ -45,25 +48,24 @@ The goal of this project was to create:
 ### Data Ingestion
 - Recursive CSV ingestion
 - Late-arriving file support
-- Standardized revenue calculation
 - Idempotent reruns
+- Revenue standardization
 
 ### Data Quality Validation
 - Schema validation
-- Duplicate detection
+- Duplicate checks
 - Missing value checks
-- Freshness monitoring
+- Freshness validation
 - Revenue anomaly monitoring
 
 ### Warehouse Layer
 - DuckDB analytical warehouse
-- Clean trusted reporting tables
+- Trusted reporting tables
 - SQL / DBT-style transformations
 
 ### Executive Dashboard
 - Revenue KPIs
 - Revenue trends
-- Moving average analysis
 - Regional contribution
 - Product intelligence
 - Data quality monitoring
@@ -83,21 +85,52 @@ The goal of this project was to create:
 
 ---
 
-## Repository Structure
+## Data Quality Checks
 
-```text
-streaming-sales-pipeline/
-│
-├── dashboard/
-├── data/
-├── docs/
-├── forecasting/
-├── ingestion/
-├── notebooks/
-├── quality_checks/
-├── scripts/
-├── transformations/
-├── warehouse/
-├── DECISIONS.md
-├── README.md
-└── requirements.txt
+| Check | Purpose |
+|---|---|
+| Schema Validation | Prevent malformed records |
+| Duplicate Detection | Prevent revenue inflation |
+| Missing Value Checks | Protect KPI accuracy |
+| Freshness Validation | Detect delayed ingestion |
+| Revenue Monitoring | Detect volatility anomalies |
+
+---
+
+## Business Outcome
+
+The platform successfully created:
+- one trusted revenue source
+- centralized KPI logic
+- visibility into data quality risks
+- explainable revenue reporting
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| `docs/data_contract.md` | Input expectations |
+| `docs/business_logic.md` | KPI definitions |
+| `docs/pipeline_flow.md` | Pipeline walkthrough |
+| `docs/cfo_investigation_note.md` | Revenue discrepancy investigation |
+| `DECISIONS.md` | Technical trade-offs & AI disclosure |
+
+---
+
+## Future Improvements
+
+- Airflow orchestration
+- Cloud warehouse migration
+- Automated alerting
+- Row-level lineage
+- Advanced forecasting
+- CI/CD deployment
+
+---
+
+## Author
+
+Yash Jain
+MBA Candidate · Analytics & Strategy
